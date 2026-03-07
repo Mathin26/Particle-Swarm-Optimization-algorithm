@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSO — Particle Swarm Optimisation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #030810;
+    --panel: #060f1e;
+    --border: #0d2a4a;
+    --accent: #00ffe7;
+    --accent2: #ff6b35;
+    --accent3: #7b2fff;
+    --text: #a8d4f5;
+    --dim: #2a4a6a;
+    --green: #39ff14;
+    --yellow: #ffe135;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,231,0.015) 2px,
+      rgba(0,255,231,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(0,255,231,0.04), transparent);
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 1.4rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px rgba(0,255,231,0.6);
+  }
+
+  .logo span { color: var(--text); font-weight: 400; }
+
+  .badge {
+    font-size: 0.65rem;
+    background: rgba(0,255,231,0.08);
+    border: 1px solid rgba(0,255,231,0.3);
+    color: var(--accent);
+    padding: 4px 10px;
+    letter-spacing: 0.15em;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 260px;
+    gap: 0;
+    height: calc(100vh - 61px);
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .panel-header {
+    padding: 8px 12px;
+    background: rgba(0,255,231,0.05);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .panel-body { padding: 14px 12px; }
+
+  .control-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+
+  .control-row:last-child { margin-bottom: 0; }
+
+  .control-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .control-label .val {
+    color: var(--accent);
+  }
+
+  input[type=range] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 0;
+    box-shadow: 0 0 8px var(--accent);
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, var(--accent) var(--pct, 0%), var(--border) var(--pct, 0%));
+    height: 3px;
+  }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    padding: 6px 8px;
+    cursor: pointer;
+    outline: none;
+    letter-spacing: 0.05em;
+  }
+
+  select:focus { border-color: var(--accent); }
+  select option { background: var(--bg); }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    border: none;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    margin-bottom: 8px;
+  }
+
+  .btn:last-child { margin-bottom: 0; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 20px rgba(0,255,231,0.3);
+  }
+
+  .btn-primary:hover {
+    background: #fff;
+    box-shadow: 0 0 30px rgba(0,255,231,0.6);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255,107,53,0.1);
+    box-shadow: 0 0 15px rgba(255,107,53,0.3);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--dim);
+    color: var(--dim);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  /* CENTER CANVAS AREA */
+  .canvas-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .canvas-hud {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+  }
+
+  .hud-item {
+    background: rgba(3,8,16,0.85);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .hud-label { color: var(--dim); }
+  .hud-val { color: var(--accent); }
+
+  .canvas-bottom-hud {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    pointer-events: none;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    background: rgba(3,8,16,0.85);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-card {
+    border: 1px solid var(--border);
+    padding: 10px 10px 8px;
+    background: rgba(0,255,231,0.02);
+  }
+
+  .stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.55rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  .stat-card.highlight .stat-value { color: var(--green); }
+  .stat-card.warn .stat-value { color: var(--accent2); }
+
+  /* Chart */
+  #chartCanvas {
+    width: 100%;
+    height: 120px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  /* Particle log */
+  .log-list {
+    height: 180px;
+    overflow-y: auto;
+    font-size: 0.58rem;
+    line-height: 1.8;
+    color: var(--dim);
+    scrollbar-width: thin;
+    scrollbar-color: var(--dim) transparent;
+  }
+
+  .log-list .log-entry { padding: 1px 4px; }
+  .log-list .log-entry:hover { background: rgba(0,255,231,0.04); color: var(--text); }
+  .log-list .log-new { color: var(--accent); }
+  .log-list .log-best { color: var(--green); }
+
+  /* Explainer modal overlay */
+  .explainer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(3,8,16,0.95);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .explainer-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .explainer-box {
+    border: 1px solid var(--accent);
+    background: var(--panel);
+    max-width: 700px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 0 60px rgba(0,255,231,0.2);
+  }
+
+  .explainer-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,255,231,0.04);
+  }
+
+  .explainer-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+  }
+
+  .close-btn {
+    background: none;
+    border: 1px solid var(--dim);
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+
+  .close-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .explainer-body { padding: 24px; }
+
+  .explainer-body h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    margin-bottom: 10px;
+    margin-top: 22px;
+  }
+
+  .explainer-body h3:first-child { margin-top: 0; }
+
+  .explainer-body p {
+    font-size: 0.72rem;
+    line-height: 1.8;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  .explainer-body code {
+    background: rgba(0,255,231,0.08);
+    border: 1px solid rgba(0,255,231,0.2);
+    color: var(--accent);
+    padding: 12px 16px;
+    display: block;
+    font-size: 0.68rem;
+    line-height: 1.9;
+    margin: 10px 0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .explainer-body ul {
+    list-style: none;
+    margin-left: 0;
+  }
+
+  .explainer-body ul li {
+    font-size: 0.7rem;
+    line-height: 1.8;
+    color: var(--text);
+    padding-left: 14px;
+    position: relative;
+  }
+
+  .explainer-body ul li::before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    .left-panel, .right-panel { height: auto; }
+    .canvas-area { height: 50vh; }
+  }
+
+  /* Status bar */
+  .status-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .status-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    transition: width 0.3s;
+  }
+
+  /* Tooltip for pause */
+  .paused-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .paused-overlay.visible { opacity: 1; }
+
+  .paused-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 0.4em;
+    text-shadow: 0 0 40px rgba(0,255,231,0.8);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PSO<span>.SIM</span></div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <button class="btn btn-ghost" style="width:auto;padding:6px 14px;margin:0;font-size:0.6rem" onclick="openExplainer()">[ ? ] EXPLAIN</button>
+    <div class="badge">PARTICLE SWARM OPTIMISATION</div>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- LEFT PANEL: Controls -->
+  <div class="left-panel">
+
+    <div class="panel-section">
+      <div class="panel-header">Simulation</div>
+      <div class="panel-body">
+        <button class="btn btn-primary" id="startBtn" onclick="toggleRun()">▶ START</button>
+        <button class="btn btn-secondary" onclick="resetSim()">⟳ RESET</button>
+        <button class="btn btn-ghost" onclick="stepOnce()">⏭ STEP ×1</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Swarm Config</div>
+      <div class="panel-body">
+        <div class="control-row">
+          <div class="control-label">Particles <span class="val" id="nParticlesVal">40</span></div>
+          <input type="range" id="nParticles" min="5" max="120" value="40" oninput="updateSlider(this,'nParticlesVal')">
+        </div>
+        <div class="control-row">
+          <div class="control-label">Inertia (ω) <span class="val" id="inertiaVal">0.72</span></div>
+          <input type="range" id="inertia" min="0.1" max="1.0" step="0.01" value="0.72" oninput="updateSlider(this,'inertiaVal')">
+        </div>
+        <div class="control-row">
+          <div class="control-label">Cognitive (c₁) <span class="val" id="cogVal">1.49</span></div>
+          <input type="range" id="cog" min="0" max="3" step="0.01" value="1.49" oninput="updateSlider(this,'cogVal')">
+        </div>
+        <div class="control-row">
+          <div class="control-label">Social (c₂) <span class="val" id="socVal">1.49</span></div>
+          <input type="range" id="soc" min="0" max="3" step="0.01" value="1.49" oninput="updateSlider(this,'socVal')">
+        </div>
+        <div class="control-row">
+          <div class="control-label">Max Velocity <span class="val" id="vmaxVal">4.0</span></div>
+          <input type="range" id="vmax" min="1" max="15" step="0.5" value="4" oninput="updateSlider(this,'vmaxVal')">
+        </div>
+        <div class="control-row">
+          <div class="control-label">Speed <span class="val" id="speedVal">1×</span></div>
+          <input type="range" id="speed" min="1" max="10" value="3" oninput="updateSlider(this,'speedVal',true)">
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Objective Function</div>
+      <div class="panel-body">
+        <div class="control-row">
+          <div class="control-label">Function</div>
+          <select id="funcSel" onchange="resetSim()">
+            <option value="rastrigin">Rastrigin</option>
+            <option value="rosenbrock">Rosenbrock</option>
+            <option value="ackley">Ackley</option>
+            <option value="sphere">Sphere</option>
+            <option value="himmelblau">Himmelblau</option>
+            <option value="eggholder">Eggholder</option>
+          </select>
+        </div>
+        <div class="control-row" style="margin-top:4px;">
+          <div class="control-label">Topology</div>
+          <select id="topoSel" onchange="resetSim()">
+            <option value="global">Global Best</option>
+            <option value="ring">Ring (Local)</option>
+            <option value="random">Random K=3</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Display</div>
+      <div class="panel-body">
+        <div class="control-row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.65rem;color:var(--text)">
+            <input type="checkbox" id="showTrails" checked style="accent-color:var(--accent)">
+            SHOW TRAILS
+          </label>
+        </div>
+        <div class="control-row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.65rem;color:var(--text)">
+            <input type="checkbox" id="showVectors" style="accent-color:var(--accent)">
+            SHOW VELOCITY
+          </label>
+        </div>
+        <div class="control-row">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.65rem;color:var(--text)">
+            <input type="checkbox" id="showHeatmap" checked style="accent-color:var(--accent)">
+            SHOW HEATMAP
+          </label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Canvas -->
+  <div class="canvas-area">
+    <canvas id="mainCanvas"></canvas>
+
+    <div class="canvas-hud">
+      <div class="hud-item">
+        <span class="hud-label">ITER</span>
+        <span class="hud-val" id="hudIter">0</span>
+        <span class="hud-label" style="margin-left:8px;">BEST</span>
+        <span class="hud-val" id="hudBest">—</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">GBEST POS</span>
+        <span class="hud-val" id="hudGBestPos">—</span>
+      </div>
+      <div class="hud-item" id="hudConverge" style="display:none;">
+        <span style="color:var(--green)">✓ CONVERGED</span>
+      </div>
+    </div>
+
+    <div class="canvas-bottom-hud">
+      <div class="legend-item"><div class="legend-dot" style="background:#00ffe7;box-shadow:0 0 6px #00ffe7"></div>PARTICLE</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffe135;box-shadow:0 0 6px #ffe135"></div>PERSONAL BEST</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ff6b35;box-shadow:0 0 10px #ff6b35;width:12px;height:12px"></div>GLOBAL BEST</div>
+    </div>
+
+    <div class="paused-overlay" id="pausedOverlay">
+      <div class="paused-text">PAUSED</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-bar-fill" id="statusBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Stats -->
+  <div class="right-panel">
+
+    <div class="panel-section">
+      <div class="panel-header">Live Stats</div>
+      <div class="panel-body">
+        <div class="stat-grid">
+          <div class="stat-card highlight">
+            <div class="stat-value" id="statBest">—</div>
+            <div class="stat-label">Global Best</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statIter">0</div>
+            <div class="stat-label">Iterations</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statAvg">—</div>
+            <div class="stat-label">Avg Fitness</div>
+          </div>
+          <div class="stat-card warn">
+            <div class="stat-value" id="statStagnate">0</div>
+            <div class="stat-label">Stagnation</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Convergence Chart</div>
+      <div class="panel-body" style="padding:8px;">
+        <canvas id="chartCanvas" width="228" height="120"></canvas>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Velocity Distribution</div>
+      <div class="panel-body" style="padding:8px;">
+        <canvas id="velCanvas" width="228" height="70"></canvas>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-header">Event Log</div>
+      <div class="panel-body" style="padding:6px;">
+        <div class="log-list" id="logList"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- EXPLAINER MODAL -->
+<div class="explainer-overlay" id="explainerOverlay">
+  <div class="explainer-box">
+    <div class="explainer-header">
+      <div class="explainer-title">HOW PSO WORKS</div>
+      <button class="close-btn" onclick="closeExplainer()">✕ CLOSE</button>
+    </div>
+    <div class="explainer-body">
+      <h3>What is Particle Swarm Optimisation?</h3>
+      <p>PSO is a population-based metaheuristic algorithm inspired by the social behaviour of birds flocking or fish schooling. Each "particle" is a candidate solution flying through the search space, guided by its own experience and the swarm's collective knowledge.</p>
+
+      <h3>The Core Equations</h3>
+      <p>Each particle has a <strong>position</strong> x and <strong>velocity</strong> v. At every iteration:</p>
+      <code>v(t+1) = ω·v(t)
+        + c₁·r₁·(pBest - x(t))   ← cognitive
+        + c₂·r₂·(gBest - x(t))   ← social
+
+x(t+1) = x(t) + v(t+1)</code>
+      <p>Where r₁, r₂ are random numbers in [0,1] drawn each step.</p>
+
+      <h3>Parameters Explained</h3>
+      <ul>
+        <li><strong>ω (Inertia)</strong> — Controls momentum. High ω = exploration, low ω = exploitation.</li>
+        <li><strong>c₁ (Cognitive)</strong> — How strongly a particle is pulled toward its own best position.</li>
+        <li><strong>c₂ (Social)</strong> — How strongly a particle is pulled toward the swarm's best position.</li>
+        <li><strong>v_max</strong> — Clamps velocity to prevent particles from flying out of bounds.</li>
+      </ul>
+
+      <h3>Topologies</h3>
+      <ul>
+        <li><strong>Global Best</strong> — All particles share one global best. Fast convergence, risk of premature convergence.</li>
+        <li><strong>Ring (Local)</strong> — Each particle only sees its two neighbours. Slower but explores more.</li>
+        <li><strong>Random K=3</strong> — Each particle connects to 3 random others. Balanced exploration.</li>
+      </ul>
+
+      <h3>Objective Functions in this Demo</h3>
+      <ul>
+        <li><strong>Rastrigin</strong> — Many local minima. Classic hard benchmark. Global min = 0.</li>
+        <li><strong>Rosenbrock</strong> — Banana-shaped valley. Global min = 0 at (1,1).</li>
+        <li><strong>Ackley</strong> — Many local minima, flat outer regions. Min = 0 at (0,0).</li>
+        <li><strong>Sphere</strong> — Simple parabola. Min = 0 at (0,0). Tests basic convergence.</li>
+        <li><strong>Himmelblau</strong> — Four equal global minima. Interesting multi-modal structure.</li>
+        <li><strong>Eggholder</strong> — Highly complex, many local minima arranged in an egg pattern.</li>
+      </ul>
+
+      <h3>How to Use This Simulator</h3>
+      <ul>
+        <li>Press <strong>START</strong> to run the swarm. Particles appear as cyan dots on the heatmap.</li>
+        <li>The <strong>orange star</strong> marks the current global best found.</li>
+        <li>Dim yellow dots are each particle's personal best.</li>
+        <li>Adjust parameters mid-run to see their real-time effect.</li>
+        <li>Watch the <strong>Convergence Chart</strong> to see fitness improving over iterations.</li>
+        <li>Try <strong>Ring topology</strong> on Rastrigin vs Global to see the exploration difference.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PSO Simulation Engine
+// ============================================================
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const chartCanvas = document.getElementById('chartCanvas');
+const chartCtx = chartCanvas.getContext('2d');
+const velCanvas = document.getElementById('velCanvas');
+const velCtx = velCanvas.getContext('2d');
+
+let W, H;
+let running = false;
+let animId = null;
+let lastTime = 0;
+let iteration = 0;
+let stagnation = 0;
+let lastGBest = Infinity;
+let converged = false;
+let heatmapCache = null;
+let stepCount = 0;
+
+// Particle state
+let particles = [];
+let gBestPos = null;
+let gBestVal = Infinity;
+let convergenceHistory = [];
+let trailBuffers = [];
+
+// ---- Objective Functions ----
+const FUNCS = {
+  rastrigin: {
+    bounds: [-5.12, 5.12],
+    fn: (x, y) => 20 + x*x - 10*Math.cos(2*Math.PI*x) + y*y - 10*Math.cos(2*Math.PI*y),
+    minVal: 0, minPos: [0,0]
+  },
+  rosenbrock: {
+    bounds: [-2.048, 2.048],
+    fn: (x, y) => 100*(y - x*x)**2 + (1-x)**2,
+    minVal: 0, minPos: [1,1]
+  },
+  ackley: {
+    bounds: [-5, 5],
+    fn: (x, y) => -20*Math.exp(-0.2*Math.sqrt(0.5*(x*x+y*y)))
+                  - Math.exp(0.5*(Math.cos(2*Math.PI*x)+Math.cos(2*Math.PI*y)))
+                  + Math.E + 20,
+    minVal: 0, minPos: [0,0]
+  },
+  sphere: {
+    bounds: [-5, 5],
+    fn: (x, y) => x*x + y*y,
+    minVal: 0, minPos: [0,0]
+  },
+  himmelblau: {
+    bounds: [-5, 5],
+    fn: (x, y) => (x*x+y-11)**2 + (x+y*y-7)**2,
+    minVal: 0, minPos: [3,2]
+  },
+  eggholder: {
+    bounds: [-512, 512],
+    fn: (x, y) => -(y+47)*Math.sin(Math.sqrt(Math.abs(x/2+(y+47))))
+                  - x*Math.sin(Math.sqrt(Math.abs(x-(y+47)))),
+    minVal: -959.6407, minPos: [512, 404.2319]
+  }
+};
+
+function getConfig() {
+  return {
+    n: parseInt(document.getElementById('nParticles').value),
+    omega: parseFloat(document.getElementById('inertia').value),
+    c1: parseFloat(document.getElementById('cog').value),
+    c2: parseFloat(document.getElementById('soc').value),
+    vmax: parseFloat(document.getElementById('vmax').value),
+    speed: parseInt(document.getElementById('speed').value),
+    func: document.getElementById('funcSel').value,
+    topo: document.getElementById('topoSel').value,
+    trails: document.getElementById('showTrails').checked,
+    vectors: document.getElementById('showVectors').checked,
+    heatmap: document.getElementById('showHeatmap').checked
+  };
+}
+
+function resizeCanvas() {
+  const area = canvas.parentElement;
+  W = canvas.width = area.clientWidth;
+  H = canvas.height = area.clientHeight;
+  heatmapCache = null; // force redraw
+}
+
+// ---- Space <-> Canvas coord transforms ----
+function spaceToCanvas(sx, sy, bounds) {
+  const pad = 40;
+  const range = bounds[1] - bounds[0];
+  const cx = pad + (sx - bounds[0]) / range * (W - 2*pad);
+  const cy = H - pad - (sy - bounds[0]) / range * (H - 2*pad);
+  return [cx, cy];
+}
+
+function canvasToSpace(cx, cy, bounds) {
+  const pad = 40;
+  const range = bounds[1] - bounds[0];
+  const sx = bounds[0] + (cx - pad) / (W - 2*pad) * range;
+  const sy = bounds[0] + (H - pad - cy) / (H - 2*pad) * range;
+  return [sx, sy];
+}
+
+// ---- Heatmap Generation ----
+function buildHeatmap(funcKey, bounds) {
+  const res = 200;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = W; offscreen.height = H;
+  const oc = offscreen.getContext('2d');
+  const idata = oc.createImageData(W, H);
+
+  // sample function on a grid
+  const vals = [];
+  for (let j = 0; j < res; j++) {
+    for (let i = 0; i < res; i++) {
+      const sx = bounds[0] + i / (res-1) * (bounds[1]-bounds[0]);
+      const sy = bounds[0] + j / (res-1) * (bounds[1]-bounds[0]);
+      vals.push(FUNCS[funcKey].fn(sx, sy));
+    }
+  }
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+
+  // colour each canvas pixel
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const [sx, sy] = canvasToSpace(px, py, bounds);
+      if (sx < bounds[0] || sx > bounds[1] || sy < bounds[0] || sy > bounds[1]) {
+        const idx = (py*W+px)*4;
+        idata.data[idx]=3; idata.data[idx+1]=8; idata.data[idx+2]=16; idata.data[idx+3]=255;
+        continue;
+      }
+      const v = FUNCS[funcKey].fn(sx, sy);
+      const t = Math.max(0, Math.min(1, (v - minV) / (maxV - minV)));
+      const idx = (py*W+px)*4;
+      // colour palette: deep blue -> purple -> red -> orange -> yellow
+      const r = Math.round(Math.pow(t, 0.5) * 180);
+      const g = Math.round(Math.pow(Math.max(0, t-0.3)/0.7, 1.5) * 80);
+      const b = Math.round((1-t)*120 + Math.pow(1-t,3)*80);
+      idata.data[idx] = r;
+      idata.data[idx+1] = g;
+      idata.data[idx+2] = b;
+      idata.data[idx+3] = 255;
+    }
+  }
+  oc.putImageData(idata, 0, 0);
+  return offscreen;
+}
+
+// ---- Initialise Swarm ----
+function initSwarm() {
+  const cfg = getConfig();
+  const bounds = FUNCS[cfg.func].bounds;
+  const range = bounds[1] - bounds[0];
+  particles = [];
+  gBestPos = null;
+  gBestVal = Infinity;
+  convergenceHistory = [];
+  trailBuffers = [];
+  iteration = 0;
+  stagnation = 0;
+  lastGBest = Infinity;
+  converged = false;
+  stepCount = 0;
+  document.getElementById('hudConverge').style.display = 'none';
+
+  for (let i = 0; i < cfg.n; i++) {
+    const px = bounds[0] + Math.random() * range;
+    const py = bounds[0] + Math.random() * range;
+    const vx = (Math.random()-0.5) * cfg.vmax;
+    const vy = (Math.random()-0.5) * cfg.vmax;
+    const val = FUNCS[cfg.func].fn(px, py);
+    const p = { x: px, y: py, vx, vy, pbx: px, pby: py, pbVal: val, color: hsl(i, cfg.n) };
+    particles.push(p);
+    trailBuffers.push([]);
+    if (val < gBestVal) { gBestVal = val; gBestPos = [px, py]; }
+  }
+  updateTopology(cfg);
+  logEvent('SWARM INITIALISED — ' + cfg.n + ' particles', 'log-new');
+  logEvent('Function: ' + cfg.func.toUpperCase() + ' | Topology: ' + cfg.topo.toUpperCase(), '');
+}
+
+function hsl(i, n) {
+  const h = (i / n * 240 + 160) % 360;
+  return `hsl(${h},90%,65%)`;
+}
+
+// ---- Topology ----
+function updateTopology(cfg) {
+  const n = particles.length;
+  if (cfg.topo === 'ring') {
+    for (let i = 0; i < n; i++) {
+      particles[i].neighbors = [(i-1+n)%n, i, (i+1)%n];
+    }
+  } else if (cfg.topo === 'random') {
+    for (let i = 0; i < n; i++) {
+      const nb = new Set([i]);
+      while (nb.size < Math.min(4, n)) nb.add(Math.floor(Math.random()*n));
+      particles[i].neighbors = [...nb];
+    }
+  } else {
+    // global: no neighbors list, use global gBest
+    for (let i = 0; i < n; i++) particles[i].neighbors = null;
+  }
+}
+
+function localBest(p) {
+  let lb = p.pbVal, lpos = [p.pbx, p.pby];
+  if (p.neighbors) {
+    for (const ni of p.neighbors) {
+      const nb = particles[ni];
+      if (nb.pbVal < lb) { lb = nb.pbVal; lpos = [nb.pbx, nb.pby]; }
+    }
+  } else {
+    lpos = gBestPos;
+  }
+  return lpos;
+}
+
+// ---- PSO Step ----
+function step() {
+  const cfg = getConfig();
+  const bounds = FUNCS[cfg.func].bounds;
+  const range = bounds[1] - bounds[0];
+  let improved = false;
+
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    const lbPos = localBest(p);
+    const r1 = Math.random(), r2 = Math.random();
+
+    // Velocity update
+    p.vx = cfg.omega * p.vx
+          + cfg.c1 * r1 * (p.pbx - p.x)
+          + cfg.c2 * r2 * (lbPos[0] - p.x);
+    p.vy = cfg.omega * p.vy
+          + cfg.c1 * r1 * (p.pby - p.y)
+          + cfg.c2 * r2 * (lbPos[1] - p.y);
+
+    // Clamp velocity
+    const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+    if (speed > cfg.vmax) { p.vx *= cfg.vmax/speed; p.vy *= cfg.vmax/speed; }
+
+    // Position update
+    p.x += p.vx; p.y += p.vy;
+
+    // Boundary reflection
+    if (p.x < bounds[0]) { p.x = bounds[0] + Math.abs(p.x - bounds[0]) % range; p.vx *= -0.5; }
+    if (p.x > bounds[1]) { p.x = bounds[1] - Math.abs(p.x - bounds[1]) % range; p.vx *= -0.5; }
+    if (p.y < bounds[0]) { p.y = bounds[0] + Math.abs(p.y - bounds[0]) % range; p.vy *= -0.5; }
+    if (p.y > bounds[1]) { p.y = bounds[1] - Math.abs(p.y - bounds[1]) % range; p.vy *= -0.5; }
+
+    // Evaluate
+    const val = FUNCS[cfg.func].fn(p.x, p.y);
+
+    // Update personal best
+    if (val < p.pbVal) { p.pbx = p.x; p.pby = p.y; p.pbVal = val; }
+
+    // Update global best
+    if (val < gBestVal) {
+      gBestVal = val;
+      gBestPos = [p.x, p.y];
+      improved = true;
+    }
+
+    // Trail
+    if (cfg.trails) {
+      const [cx, cy] = spaceToCanvas(p.x, p.y, bounds);
+      trailBuffers[i].push([cx, cy]);
+      if (trailBuffers[i].length > 25) trailBuffers[i].shift();
+    } else {
+      trailBuffers[i] = [];
+    }
+  }
+
+  iteration++;
+  convergenceHistory.push(gBestVal);
+  if (convergenceHistory.length > 300) convergenceHistory.shift();
+
+  if (improved) {
+    stagnation = 0;
+    logEvent(`↑ ITER ${iteration}: gBest = ${gBestVal.toFixed(5)}`, 'log-best');
+  } else {
+    stagnation++;
+  }
+
+  // Convergence check
+  const fInfo = FUNCS[cfg.func];
+  if (!converged && Math.abs(gBestVal - fInfo.minVal) < 0.05) {
+    converged = true;
+    document.getElementById('hudConverge').style.display = 'flex';
+    logEvent(`✓ CONVERGED at iter ${iteration}!`, 'log-new');
+  }
+
+  updateStats();
+}
+
+// ---- Draw ----
+function draw() {
+  const cfg = getConfig();
+  const bounds = FUNCS[cfg.func].bounds;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Heatmap
+  if (cfg.heatmap) {
+    if (!heatmapCache) heatmapCache = buildHeatmap(cfg.func, bounds);
+    ctx.drawImage(heatmapCache, 0, 0);
+  } else {
+    ctx.fillStyle = '#030810';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(13,42,74,0.6)';
+  ctx.lineWidth = 1;
+  const gridN = 8;
+  for (let i = 0; i <= gridN; i++) {
+    const t = i/gridN;
+    const x = 40 + t*(W-80);
+    const y = 40 + t*(H-80);
+    ctx.beginPath(); ctx.moveTo(x,40); ctx.lineTo(x,H-40); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke();
+  }
+
+  // Axis labels
+  ctx.font = '10px Share Tech Mono';
+  ctx.fillStyle = 'rgba(42,74,106,0.8)';
+  ctx.textAlign = 'center';
+  const bmin = bounds[0].toFixed(1), bmax = bounds[1].toFixed(1);
+  ctx.fillText(bmin, 40, H-24);
+  ctx.fillText(bmax, W-40, H-24);
+  ctx.textAlign = 'right';
+  ctx.fillText(bmax, 36, 44);
+  ctx.fillText(bmin, 36, H-44);
+
+  // Trails
+  for (let i = 0; i < particles.length; i++) {
+    const trail = trailBuffers[i];
+    if (trail.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(trail[0][0], trail[0][1]);
+    for (let t = 1; t < trail.length; t++) ctx.lineTo(trail[t][0], trail[t][1]);
+    ctx.strokeStyle = particles[i].color.replace('65%', '40%').replace('hsl', 'hsla').replace(')', ',0.4)');
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Personal bests
+  for (const p of particles) {
+    const [cx, cy] = spaceToCanvas(p.pbx, p.pby, bounds);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,225,53,0.35)';
+    ctx.fill();
+  }
+
+  // Velocity vectors
+  if (cfg.vectors) {
+    for (const p of particles) {
+      const [cx, cy] = spaceToCanvas(p.x, p.y, bounds);
+      const range = bounds[1]-bounds[0];
+      const scale = (W-80)/range * 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + p.vx*scale, cy - p.vy*scale);
+      ctx.strokeStyle = 'rgba(123,47,255,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Particles
+  for (const p of particles) {
+    const [cx, cy] = spaceToCanvas(p.x, p.y, bounds);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4.5, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = p.color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Global best
+  if (gBestPos) {
+    const [cx, cy] = spaceToCanvas(gBestPos[0], gBestPos[1], bounds);
+    // Pulse ring
+    const pulse = (Math.sin(stepCount * 0.1) + 1) / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12 + pulse*8, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(255,107,53,${0.3 + pulse*0.4})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Star
+    drawStar(ctx, cx, cy, 8, 4, 5);
+    ctx.fillStyle = '#ff6b35';
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ff6b35';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Known optimum
+    const knownPos = FUNCS[cfg.func].minPos;
+    const [kx, ky] = spaceToCanvas(knownPos[0], knownPos[1], bounds);
+    ctx.beginPath();
+    ctx.arc(kx, ky, 6, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(57,255,20,0.7)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(57,255,20,0.2)';
+    ctx.fill();
+  }
+
+  stepCount++;
+}
+
+function drawStar(ctx, cx, cy, outerR, innerR, points) {
+  ctx.beginPath();
+  for (let i = 0; i < points*2; i++) {
+    const r = i%2===0 ? outerR : innerR;
+    const angle = (i * Math.PI / points) - Math.PI/2;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+}
+
+// ---- Chart ----
+function drawChart() {
+  const cw = chartCanvas.offsetWidth, ch = chartCanvas.offsetHeight;
+  chartCanvas.width = cw; chartCanvas.height = ch;
+  chartCtx.clearRect(0, 0, cw, ch);
+  chartCtx.fillStyle = '#060f1e';
+  chartCtx.fillRect(0,0,cw,ch);
+
+  const hist = convergenceHistory;
+  if (hist.length < 2) return;
+
+  const minV = Math.min(...hist), maxV = Math.max(...hist);
+  const range = maxV - minV || 1;
+  const pad = 10;
+
+  // Gradient fill
+  const grad = chartCtx.createLinearGradient(0, pad, 0, ch-pad);
+  grad.addColorStop(0, 'rgba(0,255,231,0.4)');
+  grad.addColorStop(1, 'rgba(0,255,231,0.0)');
+
+  chartCtx.beginPath();
+  chartCtx.moveTo(pad, ch-pad);
+  for (let i = 0; i < hist.length; i++) {
+    const x = pad + i/(hist.length-1)*(cw-2*pad);
+    const y = pad + (1 - (hist[i]-minV)/range)*(ch-2*pad);
+    i===0 ? chartCtx.moveTo(x,y) : chartCtx.lineTo(x,y);
+  }
+  chartCtx.lineTo(cw-pad, ch-pad);
+  chartCtx.closePath();
+  chartCtx.fillStyle = grad;
+  chartCtx.fill();
+
+  // Line
+  chartCtx.beginPath();
+  for (let i = 0; i < hist.length; i++) {
+    const x = pad + i/(hist.length-1)*(cw-2*pad);
+    const y = pad + (1 - (hist[i]-minV)/range)*(ch-2*pad);
+    i===0 ? chartCtx.moveTo(x,y) : chartCtx.lineTo(x,y);
+  }
+  chartCtx.strokeStyle = '#00ffe7';
+  chartCtx.lineWidth = 1.5;
+  chartCtx.stroke();
+
+  // Labels
+  chartCtx.font = '9px Share Tech Mono';
+  chartCtx.fillStyle = 'rgba(42,74,106,0.9)';
+  chartCtx.textAlign = 'left';
+  chartCtx.fillText(maxV.toFixed(2), pad+2, pad+9);
+  chartCtx.fillText(minV.toFixed(2), pad+2, ch-pad-2);
+}
+
+// ---- Velocity Histogram ----
+function drawVelHist() {
+  const cw = velCanvas.offsetWidth, ch = velCanvas.offsetHeight;
+  velCanvas.width = cw; velCanvas.height = ch;
+  velCtx.clearRect(0,0,cw,ch);
+  velCtx.fillStyle = '#060f1e';
+  velCtx.fillRect(0,0,cw,ch);
+
+  if (particles.length === 0) return;
+  const speeds = particles.map(p => Math.sqrt(p.vx*p.vx + p.vy*p.vy));
+  const maxS = Math.max(...speeds);
+  const bins = 20;
+  const counts = new Array(bins).fill(0);
+  for (const s of speeds) {
+    const b = Math.min(bins-1, Math.floor(s/maxS*bins));
+    counts[b]++;
+  }
+  const maxC = Math.max(...counts);
+  const bw = cw/bins;
+  for (let i = 0; i < bins; i++) {
+    const bh = counts[i]/maxC*(ch-8);
+    const t = i/bins;
+    velCtx.fillStyle = `hsl(${160+t*60},90%,${45+t*20}%)`;
+    velCtx.fillRect(i*bw+1, ch-bh, bw-2, bh);
+  }
+  velCtx.font = '9px Share Tech Mono';
+  velCtx.fillStyle = 'rgba(42,74,106,0.9)';
+  velCtx.textAlign = 'left'; velCtx.fillText('0', 2, ch-2);
+  velCtx.textAlign = 'right'; velCtx.fillText(maxS.toFixed(1), cw-2, ch-2);
+}
+
+// ---- Stats UI ----
+function updateStats() {
+  const cfg = getConfig();
+  document.getElementById('statBest').textContent = gBestVal.toFixed(4);
+  document.getElementById('statIter').textContent = iteration;
+  const avgFit = particles.reduce((s,p) => s + FUNCS[cfg.func].fn(p.x,p.y), 0) / particles.length;
+  document.getElementById('statAvg').textContent = avgFit.toFixed(3);
+  document.getElementById('statStagnate').textContent = stagnation;
+  document.getElementById('hudIter').textContent = iteration;
+  document.getElementById('hudBest').textContent = gBestVal.toFixed(5);
+  if (gBestPos) document.getElementById('hudGBestPos').textContent =
+    `(${gBestPos[0].toFixed(3)}, ${gBestPos[1].toFixed(3)})`;
+
+  // Progress bar: distance to known min
+  const fInfo = FUNCS[cfg.func];
+  const progress = Math.max(0, 1 - Math.abs(gBestVal - fInfo.minVal) / (Math.abs(fInfo.minVal) + 1));
+  document.getElementById('statusBar').style.width = (progress*100).toFixed(1)+'%';
+}
+
+// ---- Log ----
+function logEvent(msg, cls) {
+  const el = document.getElementById('logList');
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + (cls||'');
+  div.textContent = `[${iteration.toString().padStart(4,'0')}] ${msg}`;
+  el.insertBefore(div, el.firstChild);
+  while (el.children.length > 80) el.removeChild(el.lastChild);
+}
+
+// ---- Main Loop ----
+function gameLoop(timestamp) {
+  if (!running) return;
+  const cfg = getConfig();
+  const stepsPerFrame = cfg.speed;
+  for (let i = 0; i < stepsPerFrame; i++) step();
+  draw();
+  drawChart();
+  drawVelHist();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ---- Controls ----
+function toggleRun() {
+  if (particles.length === 0) initSwarm();
+  running = !running;
+  const btn = document.getElementById('startBtn');
+  const overlay = document.getElementById('pausedOverlay');
+  if (running) {
+    btn.textContent = '⏸ PAUSE';
+    overlay.classList.remove('visible');
+    animId = requestAnimationFrame(gameLoop);
+  } else {
+    btn.textContent = '▶ RESUME';
+    overlay.classList.add('visible');
+    if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function resetSim() {
+  running = false;
+  if (animId) cancelAnimationFrame(animId);
+  document.getElementById('startBtn').textContent = '▶ START';
+  document.getElementById('pausedOverlay').classList.remove('visible');
+  heatmapCache = null;
+  initSwarm();
+  draw();
+  drawChart();
+  drawVelHist();
+}
+
+function stepOnce() {
+  if (particles.length === 0) initSwarm();
+  if (running) { running = false; if (animId) cancelAnimationFrame(animId); }
+  document.getElementById('startBtn').textContent = '▶ RESUME';
+  step();
+  draw();
+  drawChart();
+  drawVelHist();
+}
+
+function updateSlider(el, labelId, isSpeed) {
+  const v = parseFloat(el.value);
+  if (isSpeed) {
+    document.getElementById(labelId).textContent = v + '×';
+  } else {
+    document.getElementById(labelId).textContent = Number.isInteger(v) ? v : v.toFixed(2);
+  }
+  // Update track fill
+  const min = parseFloat(el.min), max = parseFloat(el.max);
+  const pct = ((v - min) / (max - min) * 100).toFixed(1) + '%';
+  el.style.setProperty('--pct', pct);
+}
+
+// Init all slider display values
+document.querySelectorAll('input[type=range]').forEach(el => {
+  const labelId = el.id + 'Val';
+  const isSpeed = el.id === 'speed';
+  if (document.getElementById(labelId)) updateSlider(el, labelId, isSpeed);
+});
+
+// ---- Explainer ----
+function openExplainer() { document.getElementById('explainerOverlay').classList.add('open'); }
+function closeExplainer() { document.getElementById('explainerOverlay').classList.remove('open'); }
+document.getElementById('explainerOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('explainerOverlay')) closeExplainer();
+});
+
+// ---- Resize ----
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  heatmapCache = null;
+  if (particles.length > 0) draw();
+});
+
+// ---- Init ----
+resizeCanvas();
+initSwarm();
+draw();
+drawChart();
+drawVelHist();
+</script>
+</body>
+</html>
